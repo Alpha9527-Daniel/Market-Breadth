@@ -21,7 +21,7 @@
   红盘率        = 上涨家数 / (上涨 + 下跌 + 平盘)      —— 停牌股剔除
   TRIN          = (上涨家数 / 下跌家数) / (上涨成交量 / 下跌成交量)
   量比(额)      = 上涨成交额 / 下跌成交额
-  相关系数      = TRIN(t-k) 与指数当日涨跌幅的 120 个交易日滚动皮尔逊相关
+  相关系数      = TRIN(t-k) 与所属板块指数涨跌幅的 120 个交易日滚动皮尔逊相关
 
 用法：
   python build_breadth.py                 # 每日运行：补当日快照 + 导出前端数据
@@ -82,7 +82,7 @@ INDEX_SYMBOLS = {
     "sh000688": "科创50",
     "sh000698": "科创100",
 }
-BENCHMARKS = ("sh000001", "sh000985")   # 表格里固定展示的两个基准指数
+BENCHMARKS = ("sh000001", "sh000985")   # 基准指数（保留：板块指数之外想加对照时可引用）
 
 # 板块：宽度样本 + K 线对应的指数
 MARKETS = [
@@ -449,16 +449,15 @@ def rolling_corr(x: pd.Series, y: pd.Series, window: int = CORR_WINDOW, min_pair
 
 def build_market_series(market: dict, days: list[dt.date], indices: dict[str, pd.DataFrame],
                         cons: set[str] | None) -> pd.DataFrame:
-    """某个板块的逐日指标 + 与基准指数的相关系数。"""
-    # 基准指数的涨跌幅（按日期索引）
-    bench: dict[str, dict[str, float]] = {}
-    for sym in BENCHMARKS:
-        df = indices.get(sym)
-        if df is None or df.empty:
-            continue
-        close = pd.to_numeric(df["close"], errors="coerce")
+    """某个板块的逐日指标 + 与该板块指数涨跌幅的相关系数。"""
+    # 板块对应指数的涨跌幅（按日期索引）
+    idx_sym = market["index"]
+    idx_pct: dict[str, float] = {}
+    df_idx = indices.get(idx_sym)
+    if df_idx is not None and not df_idx.empty:
+        close = pd.to_numeric(df_idx["close"], errors="coerce")
         pct = close.pct_change(fill_method=None) * 100
-        bench[sym] = dict(zip(df["date"].astype(str), pct.round(2)))
+        idx_pct = dict(zip(df_idx["date"].astype(str), pct.round(2)))
 
     rows = []
     for day in days:
@@ -470,8 +469,7 @@ def build_market_series(market: dict, days: list[dt.date], indices: dict[str, pd
             if len(xsec) < 10:
                 continue
         agg = aggregate(day, xsec)
-        for sym in BENCHMARKS:
-            agg["sh_pct" if sym == "sh000001" else "csi_pct"] = bench.get(sym, {}).get(agg["date"])
+        agg["idx_pct"] = idx_pct.get(agg["date"])
         rows.append(agg)
 
     df = pd.DataFrame(rows)
@@ -479,13 +477,11 @@ def build_market_series(market: dict, days: list[dt.date], indices: dict[str, pd
         return df
     df = df.sort_values("date").reset_index(drop=True)
 
-    # TRIN(t-k) 与指数涨跌幅的滚动相关系数
+    # TRIN(t-k) 与板块指数涨跌幅的滚动相关系数
     trin = pd.to_numeric(df["trin"], errors="coerce")
+    idx_pct_series = pd.to_numeric(df["idx_pct"], errors="coerce")
     for lag in CORR_LAGS:
-        lagged = trin.shift(lag)
-        for sym, label in (("sh000001", "u"), ("sh000985", "c")):
-            pct = pd.to_numeric(df["sh_pct" if sym == "sh000001" else "csi_pct"], errors="coerce")
-            df[f"corr_{label}{lag}"] = rolling_corr(lagged, pct)
+        df[f"corr_t{lag}"] = rolling_corr(trin.shift(lag), idx_pct_series)
     return df
 
 
@@ -511,13 +507,10 @@ def export_json(series_by_market: dict[str, pd.DataFrame], indices: dict[str, pd
                 "volRatio": None if pd.isna(r["vol_ratio"]) else r["vol_ratio"],
                 "volRatioAmt": None if pd.isna(r["vol_ratio_amt"]) else r["vol_ratio_amt"],
                 "amountYi": r["amount_yi"],
-                "shPct": None if pd.isna(r.get("sh_pct")) else r.get("sh_pct"),
-                "csiPct": None if pd.isna(r.get("csi_pct")) else r.get("csi_pct"),
+                "idxPct": None if pd.isna(r.get("idx_pct")) else r.get("idx_pct"),
                 "corr": {
-                    "u1": None if pd.isna(r.get("corr_u1")) else r.get("corr_u1"),
-                    "c1": None if pd.isna(r.get("corr_c1")) else r.get("corr_c1"),
-                    "u10": None if pd.isna(r.get("corr_u10")) else r.get("corr_u10"),
-                    "c10": None if pd.isna(r.get("corr_c10")) else r.get("corr_c10"),
+                    "t1": None if pd.isna(r.get("corr_t1")) else r.get("corr_t1"),
+                    "t10": None if pd.isna(r.get("corr_t10")) else r.get("corr_t10"),
                 },
             })
         markets.append({
@@ -540,12 +533,11 @@ def export_json(series_by_market: dict[str, pd.DataFrame], indices: dict[str, pd
         "generatedAt": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "source": "AKShare · 新浪财经 / 腾讯财经 / 东方财富",
         "corrWindow": CORR_WINDOW,
-        "benchmarks": [{"symbol": s, "name": INDEX_SYMBOLS[s]} for s in BENCHMARKS],
         "definition": {
             "advRatio": "红盘率 = 上涨家数 / (上涨 + 下跌 + 平盘)，停牌股剔除",
             "trin": "TRIN = (上涨家数 / 下跌家数) / (上涨成交量 / 下跌成交量)",
             "volRatioAmt": "量比(额) = 上涨成交额 / 下跌成交额",
-            "corr": "TRIN(t-k) 与指数当日涨跌幅的 120 个交易日滚动相关系数",
+            "corr": "TRIN(t-k) 与所属板块指数当日涨跌幅的 120 个交易日滚动相关系数",
         },
         "markets": markets,
         "indices": idx_payload,
@@ -638,7 +630,7 @@ def main() -> int:
     latest = series_by_market["all"].iloc[-1]
     log(f"最新 {latest['date']}：红盘率 {latest['adv_ratio']:.2f}%  TRIN {latest['trin']}  "
         f"(涨 {latest['adv']} / 跌 {latest['dec']} / 平 {latest['flat']})  "
-        f"ρ(t-1,上证) {latest.get('corr_u1')}")
+        f"ρ(t-1) {latest.get('corr_t1')}")
     return 0
 
 

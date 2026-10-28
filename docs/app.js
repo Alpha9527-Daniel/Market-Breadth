@@ -28,6 +28,7 @@
     chartMsg: document.getElementById('chart-msg'),
     rangeNote: document.getElementById('range-note'),
     kName: document.getElementById('k-name'),
+    thead: document.getElementById('detail-table').querySelector('thead'),
     table: document.getElementById('detail-table').querySelector('tbody'),
     buildInfo: document.getElementById('build-info'),
   };
@@ -180,13 +181,10 @@
   function corrCard(last) {
     const c = last.corr || {};
     const cls = (v) => (v === null || v === undefined) ? '' : (v >= 0 ? 'pos' : 'neg');
-    const cell = (label, v) => `<div class="cg"><span class="cg-k">${label}</span><b class="${cls(v)}">${signed(v, 3)}</b></div>`;
     return `<div class="kpi kpi-corr" style="--k-color:#22d3ee">
-        <div class="kpi-label">TRIN 与指数相关性<span class="kpi-tag">120 日滚动</span></div>
-        <div class="corr-grid">
-          ${cell('t-1·上证', c.u1)}${cell('t-1·全指', c.c1)}
-          ${cell('t-10·上证', c.u10)}${cell('t-10·全指', c.c10)}
-        </div>
+        <div class="kpi-label">TRIN × ${market().indexName} 相关性<span class="kpi-tag">120 日</span></div>
+        <div class="kpi-value ${cls(c.t1)}">${signed(c.t1, 3)}<span class="unit">t-1</span></div>
+        <div class="kpi-sub"><span class="plain">t-10 ${signed(c.t10, 3)}</span></div>
       </div>`;
   }
 
@@ -487,7 +485,27 @@
   }
 
   /* ------------------------------------------------------------------ table */
+  function renderTableHead() {
+    const name = market().indexName;
+    el.thead.innerHTML = `
+      <tr>
+        <th rowspan="2">日期</th>
+        <th rowspan="2">红盘率</th>
+        <th rowspan="2">TRIN</th>
+        <th rowspan="2">涨 / 跌 / 平</th>
+        <th rowspan="2">量比（额）</th>
+        <th rowspan="2">${name} 涨跌幅</th>
+        <th colspan="2" class="grp">TRIN 相关系数 <span class="th-sub">120 日滚动</span></th>
+        <th rowspan="2">成交额</th>
+      </tr>
+      <tr>
+        <th class="grp">t-1</th>
+        <th class="grp">t-10</th>
+      </tr>`;
+  }
+
   function renderTable() {
+    renderTableHead();
     const list = rows().slice().reverse();
     el.table.innerHTML = list.map((r) => {
       const c = r.corr || {};
@@ -498,12 +516,9 @@
         <td class="${r.trin !== null && r.trin !== undefined && r.trin < 1 ? 'pos' : 'neg'}">${fmt(r.trin, 3)}</td>
         <td>${r.adv} / ${r.dec} / ${r.flat}</td>
         <td>${fmt(r.volRatioAmt)}</td>
-        <td class="${pctCls(r.shPct)}">${signed(r.shPct)}%</td>
-        <td class="${pctCls(r.csiPct)}">${signed(r.csiPct)}%</td>
-        <td class="${pctCls(c.u1)}">${signed(c.u1, 3)}</td>
-        <td class="${pctCls(c.c1)}">${signed(c.c1, 3)}</td>
-        <td class="${pctCls(c.u10)}">${signed(c.u10, 3)}</td>
-        <td class="${pctCls(c.c10)}">${signed(c.c10, 3)}</td>
+        <td class="${pctCls(r.idxPct)}">${signed(r.idxPct)}%</td>
+        <td class="${pctCls(c.t1)}">${signed(c.t1, 3)}</td>
+        <td class="${pctCls(c.t10)}">${signed(c.t10, 3)}</td>
         <td>${fmt(r.amountYi, 0)} 亿</td>
       </tr>`;
     }).join('');

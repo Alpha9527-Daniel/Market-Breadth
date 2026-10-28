@@ -104,18 +104,14 @@ main { max-width: 1360px; margin: 0 auto; padding: 16px 22px 40px; }
 .kpi-sub .down { color: var(--green); }
 .kpi-sub .plain { color: var(--text-muted); }
 
-/* 相关系数卡：2×2 小格子 */
+/* 相关系数卡：数值按正负着色 */
 .kpi-tag {
   margin-left: 6px; padding: 0 5px; border-radius: 3px;
   background: var(--bg-tertiary); color: var(--text-muted);
   font-size: 9px; font-weight: 600; letter-spacing: 0;
 }
-.corr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; margin-top: 7px; }
-.cg { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
-.cg-k { font-size: 9.5px; color: var(--text-muted); white-space: nowrap; }
-.cg b { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text-primary); }
-.cg b.pos { color: var(--red); }
-.cg b.neg { color: var(--green); }
+.kpi-value.pos { color: var(--red); }
+.kpi-value.neg { color: var(--green); }
 
 /* ------------------------------------------------------------------- cards */
 .card {
@@ -186,6 +182,9 @@ thead th.grp {
   border-right: 1px solid var(--border-soft); font-size: 9.5px;
 }
 thead th.grp .th-sub { color: var(--text-muted); font-weight: 500; letter-spacing: 0; }
+/* 两行表头：第二行贴在第一行下面 */
+thead tr:first-child th { top: 0; z-index: 3; }
+thead tr:last-child th { top: 26px; z-index: 2; }
 tbody td {
   padding: 6px 9px; border-bottom: 1px solid var(--border-soft);
   font-family: var(--mono); color: var(--text-secondary); white-space: nowrap;
