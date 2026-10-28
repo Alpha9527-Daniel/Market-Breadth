@@ -1,0 +1,63 @@
+name: 市场宽广度每日更新
+
+on:
+  schedule:
+    # 每天北京时间 05:00 运行（UTC 21:00，中国无夏令时）
+    # 此时 A 股尚未开盘，快照拿到的是"上一个交易日"的收盘数据，
+    # 脚本内部会按交易时段自动把它归档到正确的交易日，不会串日期。
+    # 想改成收盘后跑：换成 cron: '5 9 * * *'（= 北京时间 17:05）
+    - cron: '0 21 * * *'
+  workflow_dispatch: {}    # 支持在 Actions 页面手动触发
+
+permissions:
+  contents: write          # 允许把结果文件提交回仓库
+
+concurrency:
+  group: breadth-daily
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 个股横截面归档：仓库里已经带了最近 260 个交易日，
+      # 缓存只是加速；缓存丢了也不影响结果（缺的日期会用逐股日线重补）。
+      - name: 恢复个股横截面归档
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: breadth-cache-${{ github.run_id }}
+          restore-keys: breadth-cache-
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 构建指标并导出看板数据
+        env:
+          TQDM_DISABLE: 1
+        run: python build_breadth.py --backfill 15
+
+      - name: 上传结果文件(artifacts 可下载)
+        uses: actions/upload-artifact@v4
+        with:
+          name: breadth-${{ github.run_id }}
+          path: |
+            data/breadth_history.csv
+            docs/data/breadth.json
+            docs/data/breadth.js
+          if-no-files-found: error
+
+      - name: 提交结果回仓库
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data docs/data
+          git diff --cached --quiet || git commit -m "每日市场宽广度数据 $(date +%Y%m%d)"
+          git push

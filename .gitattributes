@@ -1,0 +1,5 @@
+# 统一换行符：仓库与工作区都用 LF，只有 Windows 批处理用 CRLF
+* text=auto eol=lf
+*.bat text eol=crlf
+*.gz binary
+*.png binary

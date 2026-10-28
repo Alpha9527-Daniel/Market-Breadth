@@ -1,0 +1,13 @@
+# 运行日志
+*.log
+
+# Python
+__pycache__/
+*.pyc
+
+# 临时文件（调试用的脚本 / 截图）
+_*.py
+_*.png
+_*.log
+*.tmp
+data/cache/xsec/*.tmp

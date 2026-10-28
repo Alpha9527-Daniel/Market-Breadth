@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>市场宽广度 · 红盘率与阿姆氏指标</title>
+<!-- 公开研究用途：不希望被搜索引擎收录（项目子路径下的 robots.txt 不生效，只能用 meta 声明） -->
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="style.css?v=20261027">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">MB</div>
+    <div class="brand-text">
+      <h1>市场宽广度</h1>
+      <div class="sub">红盘率 · 阿姆氏指标 TRIN · 指数 K 线</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl">
+      <label>板块</label>
+      <div class="seg" id="market-btns"></div>
+    </div>
+    <div class="ctrl">
+      <label for="start-date">起始日期</label>
+      <select id="start-date" title="选择区间起始交易日，终点固定为最新交易日"></select>
+    </div>
+    <div class="ctrl">
+      <label>窗口</label>
+      <div class="seg" id="window-btns">
+        <button type="button" data-n="10" class="active">10 日</button>
+        <button type="button" data-n="20">20 日</button>
+        <button type="button" data-n="30">30 日</button>
+        <button type="button" data-n="60">60 日</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title">
+        <h2>指数 K 线 与 市场宽度</h2>
+        <span class="range-note" id="range-note">—</span>
+      </div>
+      <div class="legend">
+        <span class="lg"><b id="k-name">上证综指</b> 日 K（右轴）</span>
+        <span class="lg"><i class="sw sw-ratio"></i>红盘率（左轴 %）</span>
+        <span class="lg"><i class="sw sw-trin"></i>TRIN（右轴）</span>
+      </div>
+    </div>
+    <div class="chart-wrap" id="chart-wrap">
+      <svg id="chart" role="img" aria-label="指数K线、红盘率与阿姆氏指标走势图"></svg>
+      <div class="tooltip" id="tooltip" hidden></div>
+      <div class="state-msg" id="chart-msg" hidden></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title"><h2>区间明细</h2></div>
+      <div class="hint">按日期倒序，最近的在最上面</div>
+    </div>
+    <div class="table-wrap">
+      <table id="detail-table">
+        <thead>
+          <tr>
+            <th rowspan="2">日期</th>
+            <th rowspan="2">红盘率</th>
+            <th rowspan="2">TRIN</th>
+            <th rowspan="2">涨 / 跌 / 平</th>
+            <th rowspan="2">量比（额）</th>
+            <th colspan="2" class="grp">指数涨跌幅</th>
+            <th colspan="4" class="grp">TRIN 相关系数 <span class="th-sub">120 日滚动</span></th>
+            <th rowspan="2">成交额</th>
+          </tr>
+          <tr>
+            <th>上证综指</th>
+            <th>中证全指</th>
+            <th>t-1 · 上证</th>
+            <th>t-1 · 全指</th>
+            <th>t-10 · 上证</th>
+            <th>t-10 · 全指</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="notes">
+    <h3>口径说明</h3>
+    <ul>
+      <li><b>红盘率</b>＝上涨家数 ÷（上涨＋下跌＋平盘）。停牌、无成交的股票不计入分母；涨跌幅绝对值 ≤0.0001% 视为平盘。</li>
+      <li><b>阿姆氏指标 TRIN</b>（Arms Index）＝（上涨家数 ÷ 下跌家数）÷（上涨成交量 ÷ 下跌成交量）。低于 1 表示资金向上涨的股票集中（偏多），高于 1 表示下跌股消耗了更多成交（偏空）。</li>
+      <li><b>量比（额）</b>＝上涨股票成交额 ÷ 下跌股票成交额，用金额口径衡量资金流向，避免低价股被"股数"放大；TRIN 仍按原始定义用成交量口径。</li>
+      <li><b>相关系数</b>：把 TRIN 滞后 1 日 / 10 日后，与指数当日涨跌幅做 <b>120 个交易日滚动皮尔逊相关</b>。数值为负表示 TRIN 越高、指数越弱（TRIN 的反向性）；接近 0 表示该滞后阶数下无稳定关系。</li>
+      <li><b>板块切换</b>：沪深 A 股＝全部沪深两市；其余四个板块按<b>当前成分股</b>回溯计算（使用当前成分，存在一定的成分调整偏差）。切换板块后，家数、成交额、量比与相关系数的样本都是该板块自身。</li>
+      <li><b>指数 K 线</b>：K 线与下方指标共用同一横轴，日期严格对齐；红色为收涨、绿色为收跌。</li>
+      <li><b>更新</b>：每天北京时间 05:00 由 GitHub Actions 自动抓取<b>上一交易日</b>的收盘数据并归档，页面随后自动刷新。</li>
+    </ul>
+  </section>
+
+  <footer class="site-foot">
+    <p><strong>免责声明</strong>：本站为个人学习与研究项目，数据与图表整理自公开渠道，仅供研究参考，<em>不构成任何投资建议、要约或推荐</em>，也不提供证券投资咨询服务。据此操作的风险由使用者自行承担。</p>
+    <p><strong>数据来源</strong>：经 <a href="https://akshare.akfamily.xyz/" target="_blank" rel="noopener">AKShare</a> 取自新浪财经、腾讯财经、东方财富等公开数据源，版权归原发布方所有；数据可能存在延迟或缺失，请以交易所官方披露为准。</p>
+    <p id="build-info"></p>
+  </footer>
+</main>
+
+<!-- 数据：http(s) 下 app.js 优先 fetch data/breadth.json；双击打开(file://)时改用这里的内嵌数据 -->
+<script src="data/breadth.js?v=20261027"></script>
+<!-- 改动 app.js / style.css 时把版本号一起 +1，否则浏览器与 Pages CDN 可能继续用旧文件 -->
+<script src="app.js?v=20261027"></script>
+</body>
+</html>
